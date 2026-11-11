@@ -143,6 +143,7 @@ dialog .dmeta{color:var(--muted); font-size:13px; margin:3px 0 0; overflow-wrap:
 dialog form{display:flex; flex-direction:column; gap:12px; padding:12px 20px 20px}
 dialog form label{display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em}
 dialog form label input{font-weight:400; font-size:16px; text-transform:none; letter-spacing:normal; background:rgba(255,255,255,.55); height:42px}
+dialog form label .fhint{font-weight:400; font-size:11px; text-transform:none; letter-spacing:normal; opacity:.8; margin-top:-2px}
 .dbtns{display:flex; flex-direction:column-reverse; gap:8px; margin-top:8px}
 .dbtns button.act{height:46px; border-radius:13px; font-size:16px; min-width:0; width:100%}
 .derr{color:var(--bad-text); font-size:13px; margin:0; display:none; text-align:center}
@@ -314,9 +315,11 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
   </div>
   <form id="regForm" method="dialog" novalidate>
     <label>Item name
-      <input id="rName" list="nameList" required maxlength="100" autocomplete="off" placeholder="e.g. KU Radar">
+      <small class="fhint">What the thing is — shown on the group card and QR label</small>
+      <input id="riName" list="nameList" required maxlength="100" autocomplete="off" placeholder="e.g. KU Radar">
     </label>
-    <label>Description
+    <label>Description (optional)
+      <small class="fhint">Extra details — model, parts, cables</small>
       <input id="rDesc" maxlength="120" autocomplete="off" placeholder="e.g. Panel, Tray C24 +cable">
     </label>
     <label>Serial number
@@ -1042,7 +1045,7 @@ function openRegister(){
 
 async function submitRegister(ev){
   ev.preventDefault();
-  const name = $("rName").value.trim();
+  const name = $("riName").value.trim();
   const re = $("rErr");
   if (!name){ re.textContent = "Enter the item name."; re.style.display = "block"; return; }
   const serial = $("rSerial").value.trim();
