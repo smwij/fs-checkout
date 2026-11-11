@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FS Equipment Checkout</title>
+<style>
+/* Layout: iOS liquid-glass — large title, grouped inset cards on gray, frosted panes over fixed color pools. */
+:root{
+  --bg:#c9c9d1;
+  --panel:rgba(255,255,255,.4);
+  --field:rgba(255,255,255,.42);
+  --glass-line:rgba(255,255,255,.6);
+  --fg:#000000;
+  --muted:#6c6c70;
+  --faint:#aeaeb2;
+  --line:rgba(60,60,67,.14);
+  --accent:#007aff;
+  --accent-tint:rgba(0,122,255,.12);
+  --ok:#6dba85;
+  --ok-text:#41795a;
+  --ok-tint:rgba(109,186,133,.22);
+  --warn:#e6bc6d;
+  --warn-text:#6f5318;
+  --warn-tint:rgba(228,178,86,.48);
+  --bad:#e07a70;
+  --bad-text:#b05549;
+  --bad-tint:rgba(224,122,112,.18);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","Segoe UI",Roboto,sans-serif;
+}
+html,body{margin:0}
+body{
+  background:var(--bg);
+  color:var(--fg); font-family:var(--font); font-size:15px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:calc(56px + env(safe-area-inset-bottom,0px));
+  -webkit-font-smoothing:antialiased;
+}
+body::before{content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(420px 420px at 16% 8%, rgba(92,138,255,.65), transparent 70%),
+    radial-gradient(560px 560px at 90% 24%, rgba(174,118,255,.55), transparent 70%),
+    radial-gradient(520px 520px at 26% 90%, rgba(80,202,216,.55), transparent 70%),
+    radial-gradient(380px 380px at 72% 70%, rgba(255,255,255,.7), transparent 70%),
+    radial-gradient(300px 300px at 55% 40%, rgba(255,170,120,.35), transparent 70%)}
+.wrap{max-width:760px; margin:0 auto}
+[hidden]{display:none!important}
+
+.navrow{display:flex; justify-content:flex-end; gap:20px; padding-block:14px 0}
+.navrow a{color:var(--accent); text-decoration:none; font-size:15px}
+.navrow a:active{opacity:.5}
+header.top{padding-block:4px 16px}
+h1{font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; line-height:1.2; text-wrap:balance}
+.sub{color:var(--muted); font-size:14px; margin:4px 0 0}
+h2.sec{font-size:20px; font-weight:700; margin:26px 2px 10px}
+
+.summary{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-block:0 16px}
+.stat{border-radius:16px; padding:12px 14px 10px; color:#ffffff; border:1px solid rgba(255,255,255,.45);
+  backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
+  box-shadow:0 8px 24px rgba(40,40,60,.16), inset 0 1px 0 rgba(255,255,255,.45)}
+.stat.ok{background:rgba(109,186,133,.88)}
+.stat.warn{background:rgba(230,188,109,.92); color:#453312}
+.stat.bad{background:rgba(224,122,112,.88)}
+.stat.gray{background:rgba(142,142,150,.78)}
+.stat span{display:block; font-size:12px; font-weight:600; opacity:.95}
+.stat b{display:block; font-size:27px; font-weight:700; line-height:1.25; font-variant-numeric:tabular-nums}
+
+input,select,textarea,button{font:inherit; color:inherit}
+input,textarea{background:var(--field); border:1px solid var(--glass-line); border-radius:11px; padding:8px 12px; min-width:0; height:38px; box-sizing:border-box;
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px)}
+input::placeholder{color:var(--faint)}
+input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+/* ---- group cards ---- */
+.groups{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px}
+.gcard{all:unset; box-sizing:border-box; cursor:pointer; background:var(--panel); border:1px solid var(--glass-line); border-radius:18px; padding:14px 16px 12px;
+  display:flex; flex-direction:column; gap:7px;
+  backdrop-filter:blur(22px) saturate(1.6); -webkit-backdrop-filter:blur(22px) saturate(1.6);
+  box-shadow:0 10px 30px rgba(40,40,60,.16), inset 0 1px 0 rgba(255,255,255,.6)}
+.gcard:active{opacity:.6}
+.gcard .gn{font-weight:700; font-size:16px; overflow-wrap:anywhere}
+.gcard .gc{color:var(--muted); font-size:13px}
+.gcard .grow{display:flex; justify-content:space-between; align-items:center; gap:8px}
+.chip{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+  border-radius:999px; padding:4px 11px; white-space:nowrap}
+.chip::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+.chip.av{background:var(--ok-tint); color:var(--ok-text)}
+.chip.bo{background:var(--warn-tint); color:var(--warn-text)}
+.chip.un,.chip.od{background:var(--bad-tint); color:var(--bad-text)}
+
+/* ---- borrowed batches ---- */
+.batches{display:flex; flex-direction:column; gap:10px}
+.batch{background:var(--panel); border:1px solid var(--glass-line); border-radius:18px; overflow:hidden;
+  backdrop-filter:blur(22px) saturate(1.6); -webkit-backdrop-filter:blur(22px) saturate(1.6);
+  box-shadow:0 10px 30px rgba(40,40,60,.16), inset 0 1px 0 rgba(255,255,255,.6)}
+.batch.overdue{background:var(--bad-tint)}
+.bhead{display:flex; flex-wrap:wrap; gap:4px 20px; align-items:baseline; padding:12px 16px 9px; border-bottom:.5px solid var(--line)}
+.bhead b{font-size:15px}
+.bhead .bm{color:var(--muted); font-size:13px}
+.bhead .bm.due{color:var(--warn-text); font-weight:600}
+.bhead .bm.due.od{color:var(--bad-text)}
+.bhead .spacer{flex:1}
+ul.blist{list-style:none; margin:0; padding:0}
+ul.blist li{display:flex; align-items:center; gap:12px; padding:9px 16px}
+ul.blist li + li{border-top:.5px solid var(--line)}
+ul.blist .n{flex:1; min-width:0; overflow-wrap:anywhere}
+ul.blist .n small{color:var(--muted); display:block; font-size:12px}
+button.act{background:rgba(96,150,214,.9); color:#ffffff; border:0; border-radius:999px;
+  padding:0 18px; height:34px; min-width:88px; font-weight:600; font-size:15px; cursor:pointer}
+button.act:active{opacity:.7}
+button.act.secondary{background:rgba(255,255,255,.55); color:var(--accent); border:1px solid var(--glass-line);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:none}
+button.act.small{height:29px; min-width:72px; font-size:13px; padding:0 13px}
+button.act:disabled{opacity:.45; cursor:default}
+.empty,.banner{background:var(--panel); border-radius:18px; padding:30px 20px; text-align:center; color:var(--muted);
+  border:1px solid var(--glass-line); backdrop-filter:blur(24px) saturate(1.5); -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  box-shadow:0 10px 30px rgba(40,40,60,.14)}
+.banner.error{color:var(--fg)}
+.banner.error .fix{color:var(--muted); font-size:13px; margin-top:6px}
+footer{margin-top:24px; text-align:center; color:rgba(60,60,67,.6); font-size:12px; padding-inline:14px}
+
+/* ---- sheet-style dialog ---- */
+dialog{background:rgba(238,238,243,.72); color:var(--fg); border:1px solid rgba(255,255,255,.65); border-radius:22px; padding:0; width:min(460px,92vw);
+  backdrop-filter:blur(32px) saturate(1.6); -webkit-backdrop-filter:blur(32px) saturate(1.6);
+  box-shadow:0 24px 70px rgba(20,20,35,.35), inset 0 1px 0 rgba(255,255,255,.6)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.dhead{padding:20px 20px 6px; text-align:center}
+dialog h2{font-size:18px; font-weight:700; margin:0}
+dialog .dmeta{color:var(--muted); font-size:13px; margin:3px 0 0; overflow-wrap:anywhere}
+.picklist{list-style:none; margin:12px 14px 0; padding:0; max-height:46vh; overflow:auto;
+  background:rgba(255,255,255,.5); border:1px solid var(--glass-line); border-radius:14px}
+.picklist li{display:flex; align-items:center; gap:12px; padding:10px 14px}
+.picklist li + li{border-top:.5px solid var(--line)}
+.picklist li.off{opacity:.55}
+.picklist label{flex:1; display:flex; align-items:center; gap:12px; cursor:pointer; min-width:0}
+.picklist li.off label{cursor:default}
+.picklist .pn{flex:1; min-width:0; overflow-wrap:anywhere}
+.picklist .pn small{display:block; color:var(--muted); font-size:12px}
+.pick{width:22px; height:22px; margin:0; flex:none; accent-color:var(--accent)}
+dialog form{display:flex; flex-direction:column; gap:12px; padding:12px 20px 20px}
+dialog form label{display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em}
+dialog form label input{font-weight:400; font-size:16px; text-transform:none; letter-spacing:normal; background:rgba(255,255,255,.55); height:42px}
+.dbtns{display:flex; flex-direction:column-reverse; gap:8px; margin-top:8px}
+.dbtns button.act{height:46px; border-radius:13px; font-size:16px; min-width:0; width:100%}
+.derr{color:var(--bad-text); font-size:13px; margin:0; display:none; text-align:center}
+
+#toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  background:rgba(30,30,36,.88); color:#fff; padding:10px 18px; border-radius:999px; font-size:14px; max-width:86vw;
+  z-index:50; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); transition:opacity .3s; opacity:0; pointer-events:none}
+#toast.show{opacity:1}
+
+@media (max-width:640px){ .summary{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:480px){ h1{font-size:28px} .groups{grid-template-columns:1fr 1fr} }
+@media (prefers-reduced-motion: no-preference){
+  .gcard.pending,.batch.pending{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.55}}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="navrow">
+    <a href="https://app.notion.com/p/415ba2f49658805aa91fc5c3c0a6dd02" target="_blank" rel="noopener">FS database</a>
+    <a href="https://app.notion.com/p/6c16dd5dc1224b63921e32ef267329a1" target="_blank" rel="noopener">Borrow log</a>
+  </nav>
+  <header class="top">
+    <h1>FS Equipment Checkout</h1>
+    <p class="sub">Pick a set, tick what you're taking, borrow in one go. Records save to the Notion FS Borrow Log.</p>
+  </header>
+
+  <div class="summary" id="summary" hidden>
+    <div class="stat ok"><span>Available</span><b id="nAvail">–</b></div>
+    <div class="stat warn"><span>Borrowed</span><b id="nBorrowed">–</b></div>
+    <div class="stat bad"><span>Overdue</span><b id="nOverdue">–</b></div>
+    <div class="stat gray"><span>Total items</span><b id="nTotal">–</b></div>
+  </div>
+
+  <div id="loading" class="empty">Loading inventory…</div>
+  <div id="errbox" class="banner error" hidden></div>
+
+  <div class="groups" id="groups"></div>
+
+  <h2 class="sec" id="borrowedHead" hidden>Borrowed</h2>
+  <div class="batches" id="batches"></div>
+
+  <footer>Inventory lives in Notion · FS DB is never modified — borrows and returns only write the FS Borrow Log.</footer>
+</div>
+
+<!-- group sheet: pick items, then the borrow form -->
+<dialog id="groupDlg">
+  <div class="dhead"><h2 id="gdTitle">Group</h2><p class="dmeta" id="gdMeta"></p></div>
+  <ul class="picklist" id="gdList"></ul>
+  <form id="gdForm" method="dialog" novalidate>
+    <div id="gdFields" hidden>
+      <label>Your name<input id="fName" autocomplete="name" required></label>
+      <label>Due back (optional)<input id="fDue" type="date"></label>
+      <label>Project (optional)<input id="fProject"></label>
+      <label>Destination (optional)<input id="fDest"></label>
+      <label>Note (optional)<input id="fNote"></label>
+    </div>
+    <p class="derr" id="gdErr"></p>
+    <div class="dbtns">
+      <button class="act secondary" type="button" id="gdCancel">Cancel</button>
+      <button class="act" type="submit" id="gdGo" disabled>Borrow selected</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- return sheet -->
+<dialog id="retDlg">
+  <div class="dhead"><h2>Return</h2><p class="dmeta" id="rdMeta"></p></div>
+  <form id="rdForm" method="dialog" novalidate>
+    <label>Your name<input id="rName" autocomplete="name" required></label>
+    <p class="derr" id="rdErr"></p>
+    <div class="dbtns">
+      <button class="act secondary" type="button" id="rdCancel">Cancel</button>
+      <button class="act" type="submit">Mark returned</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- team key -->
+<dialog id="keyDlg">
+  <div class="dhead"><h2>Team key</h2><p class="dmeta">This app is protected. Enter the shared team key.</p></div>
+  <form id="keyForm" method="dialog" novalidate>
+    <label>Key<input id="kVal" type="password" required></label>
+    <p class="derr" id="kErr"></p>
+    <div class="dbtns"><button class="act" type="submit">Continue</button></div>
+  </form>
+</dialog>
+
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const todayStr = () => new Date().toISOString().slice(0, 10);
+let DATA = { items: [], records: [] };
+let openByItem = new Map();   // itemId -> open record
+let gdItems = [];             // items shown in the open group sheet
+let retIds = [];              // record ids pending return
+
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2600); }
+
+/* ---- API with optional team key ---- */
+function teamKey(){ try { return localStorage.getItem("fsKey") || ""; } catch(e){ return ""; } }
+async function api(path, opts){
+  const o = Object.assign({ headers: {} }, opts);
+  o.headers["Content-Type"] = "application/json";
+  const k = teamKey(); if (k) o.headers["x-team-key"] = k;
+  const res = await fetch(path, o);
+  if (res.status === 401){ await askKey(); return api(path, opts); }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  return data;
+}
+function askKey(){
+  return new Promise(resolve => {
+    const dlg = $("keyDlg");
+    $("kErr").style.display = teamKey() ? "block" : "none";
+    $("kErr").textContent = "That key was not accepted — try again.";
+    dlg.showModal(); $("kVal").focus();
+    $("keyForm").onsubmit = e => {
+      e.preventDefault();
+      const v = $("kVal").value.trim();
+      if (!v) return;
+      try { localStorage.setItem("fsKey", v); } catch(e2){}
+      dlg.close(); resolve();
+    };
+  });
+}
+
+/* ---- load + render ---- */
+async function load(){
+  try {
+    DATA = await api("/api/data");
+    $("loading").hidden = true; $("errbox").hidden = true;
+    openByItem = new Map();
+    for (const r of DATA.records) if (r.status === "Borrowed" && r.item) if (!openByItem.has(r.item)) openByItem.set(r.item, r);
+    render();
+  } catch (err) {
+    $("loading").hidden = true;
+    const b = $("errbox"); b.hidden = false;
+    b.innerHTML = "<b>Couldn't load the inventory.</b><div class='fix'>" + esc(err.message) +
+      "<br>Check that the Notion integration is connected to the FS Database page.</div>";
+  }
+}
+
+function itemState(it){
+  if (openByItem.has(it.id)){
+    const r = openByItem.get(it.id);
+    return (r.due && r.due < todayStr()) ? "od" : "bo";
+  }
+  if (it.status === "Spoil") return "un";
+  return "av";
+}
+
+function render(){
+  const states = DATA.items.map(itemState);
+  $("nAvail").textContent = states.filter(s => s === "av").length;
+  $("nBorrowed").textContent = states.filter(s => s === "bo" || s === "od").length;
+  $("nOverdue").textContent = states.filter(s => s === "od").length;
+  $("nTotal").textContent = DATA.items.length;
+  $("summary").hidden = false;
+
+  // group cards, in file order (lowest item No. first)
+  const groups = new Map();
+  DATA.items.forEach((it, i) => {
+    if (!groups.has(it.group)) groups.set(it.group, []);
+    groups.get(it.group).push(Object.assign({ _state: states[i] }, it));
+  });
+  const gbox = $("groups"); gbox.innerHTML = "";
+  for (const [name, items] of groups){
+    const av = items.filter(x => x._state === "av").length;
+    const od = items.some(x => x._state === "od");
+    const bo = items.some(x => x._state === "bo");
+    const chip = od ? "<span class='chip od'>Overdue</span>"
+      : av === 0 ? "<span class='chip un'>None free</span>"
+      : bo || av < items.length ? "<span class='chip bo'>Partly out</span>"
+      : "<span class='chip av'>All available</span>";
+    const el = document.createElement("button");
+    el.className = "gcard"; el.type = "button";
+    el.innerHTML = "<div class='gn'>" + esc(name) + "</div>" +
+      "<div class='grow'><span class='gc'>" + av + " of " + items.length + " available</span>" + chip + "</div>";
+    el.onclick = () => openGroup(name, items);
+    gbox.appendChild(el);
+  }
+
+  // open batches
+  const open = DATA.records.filter(r => r.status === "Borrowed");
+  const byBatch = new Map();
+  for (const r of open){
+    const k = r.batch || r.id;
+    if (!byBatch.has(k)) byBatch.set(k, []);
+    byBatch.get(k).push(r);
+  }
+  $("borrowedHead").hidden = !open.length;
+  const bbox = $("batches"); bbox.innerHTML = "";
+  const itemById = new Map(DATA.items.map(it => [it.id, it]));
+  for (const [, recs] of byBatch){
+    const r0 = recs[0];
+    const od = recs.some(r => r.due && r.due < todayStr());
+    const card = document.createElement("div");
+    card.className = "batch" + (od ? " overdue" : "");
+    const due = r0.due ? "<span class='bm due" + (od ? " od" : "") + "'>due " + esc(r0.due) + "</span>" : "";
+    let html = "<div class='bhead'><b>" + esc(r0.borrower || "?") + "</b>" +
+      "<span class='bm'>" + esc(r0.bon || "") + "</span>" + due +
+      (r0.project ? "<span class='bm'>" + esc(r0.project) + "</span>" : "") +
+      (r0.dest ? "<span class='bm'>→ " + esc(r0.dest) + "</span>" : "") +
+      "<span class='spacer'></span>";
+    if (recs.length > 1) html += "<button class='act small' data-all='1'>Return all</button>";
+    html += "</div><ul class='blist'>";
+    for (const r of recs){
+      const it = itemById.get(r.item);
+      const nm = it ? it.name + (it.desc ? " — " + it.desc : "") : "Item";
+      const sn = it && it.serial ? "<small>SN " + esc(it.serial) + "</small>" : "";
+      html += "<li><div class='n'>" + esc(nm) + sn + "</div>" +
+        "<button class='act small secondary' data-rec='" + esc(r.id) + "'>Return</button></li>";
+    }
+    html += "</ul>";
+    card.innerHTML = html;
+    card.querySelectorAll("button[data-rec]").forEach(b => b.onclick = () => openReturn([b.dataset.rec], 1));
+    const all = card.querySelector("button[data-all]");
+    if (all) all.onclick = () => openReturn(recs.map(r => r.id), recs.length);
+    bbox.appendChild(card);
+  }
+}
+
+/* ---- group sheet ---- */
+function openGroup(name, items){
+  gdItems = items;
+  $("gdTitle").textContent = name;
+  $("gdFields").hidden = true;
+  $("gdErr").style.display = "none";
+  const list = $("gdList"); list.innerHTML = "";
+  for (const it of items){
+    const li = document.createElement("li");
+    const nm = esc(it.name) + (it.desc ? " — " + esc(it.desc) : "");
+    const sn = it.serial ? "<small>SN " + esc(it.serial) + "</small>" : "";
+    if (it._state === "av"){
+      li.innerHTML = "<label><input type='checkbox' class='pick' checked data-id='" + esc(it.id) + "'>" +
+        "<div class='pn'>" + nm + sn + "</div></label><span class='chip av'>Free</span>";
+    } else if (it._state === "un"){
+      li.className = "off";
+      li.innerHTML = "<label><input type='checkbox' class='pick' disabled>" +
+        "<div class='pn'>" + nm + sn + (it.remarks ? "<small>" + esc(it.remarks) + "</small>" : "") + "</div></label><span class='chip un'>Spoil</span>";
+    } else {
+      const r = openByItem.get(it.id);
+      const who = r ? esc(r.borrower || "?") + (r.due ? " · due " + esc(r.due) : "") : "";
+      li.className = "off";
+      li.innerHTML = "<label><input type='checkbox' class='pick' disabled>" +
+        "<div class='pn'>" + nm + sn + "<small>" + who + "</small></div></label>" +
+        "<span class='chip " + (it._state === "od" ? "od'>Overdue" : "bo'>Out") + "</span>";
+    }
+    list.appendChild(li);
+  }
+  list.querySelectorAll("input.pick:not(:disabled)").forEach(cb => cb.onchange = updateCount);
+  updateCount();
+  $("groupDlg").showModal();
+}
+
+function picked(){ return [...$("gdList").querySelectorAll("input.pick:checked:not(:disabled)")].map(cb => cb.dataset.id); }
+function updateCount(){
+  const n = picked().length;
+  const go = $("gdGo");
+  go.disabled = n === 0;
+  go.textContent = n ? "Borrow selected (" + n + ")" : "Borrow selected";
+}
+
+$("gdCancel").onclick = () => $("groupDlg").close();
+$("gdForm").onsubmit = async e => {
+  e.preventDefault();
+  const ids = picked();
+  if (!ids.length) return;
+  if ($("gdFields").hidden){
+    $("gdFields").hidden = false;
+    try { $("fName").value = localStorage.getItem("fsName") || ""; } catch(e2){}
+    $("fName").focus();
+    return;
+  }
+  const name = $("fName").value.trim();
+  const err = $("gdErr");
+  if (!name){ err.textContent = "Enter your name."; err.style.display = "block"; return; }
+  err.style.display = "none";
+  const go = $("gdGo"); go.disabled = true; go.textContent = "Saving…";
+  try {
+    const byId = new Map(gdItems.map(it => [it.id, it]));
+    const items = ids.map(id => { const it = byId.get(id); return { id, name: it ? it.name + (it.desc ? " " + it.desc : "") : "Item", group: it ? it.group : "" }; });
+    await api("/api/borrow", { method: "POST", body: JSON.stringify({
+      items, borrower: name, due: $("fDue").value || null,
+      project: $("fProject").value.trim() || null, dest: $("fDest").value.trim() || null, note: $("fNote").value.trim() || null
+    })});
+    try { localStorage.setItem("fsName", name); } catch(e2){}
+    $("groupDlg").close();
+    toast("Borrowed " + items.length + " item" + (items.length > 1 ? "s" : "") + " ✓");
+    await load();
+  } catch (e2) {
+    err.textContent = e2.message; err.style.display = "block";
+    go.disabled = false; updateCount();
+  }
+};
+
+/* ---- return sheet ---- */
+function openReturn(ids, count){
+  retIds = ids;
+  $("rdMeta").textContent = count === 1 ? "Mark 1 item as returned." : "Mark " + count + " items as returned.";
+  $("rdErr").style.display = "none";
+  try { $("rName").value = localStorage.getItem("fsName") || ""; } catch(e){}
+  $("retDlg").showModal();
+}
+$("rdCancel").onclick = () => $("retDlg").close();
+$("rdForm").onsubmit = async e => {
+  e.preventDefault();
+  const name = $("rName").value.trim();
+  const err = $("rdErr");
+  if (!name){ err.textContent = "Enter your name."; err.style.display = "block"; return; }
+  err.style.display = "none";
+  try {
+    await api("/api/return", { method: "POST", body: JSON.stringify({ recordIds: retIds, borrower: name }) });
+    try { localStorage.setItem("fsName", name); } catch(e2){}
+    $("retDlg").close();
+    toast("Returned ✓");
+    await load();
+  } catch (e2) {
+    err.textContent = e2.message; err.style.display = "block";
+  }
+};
+
+load();
+</script>
+</body>
+</html>

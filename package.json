@@ -1,0 +1,12 @@
+{
+  "name": "fs-equipment-checkout",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Group-based borrow/return web app for the Cap.Dev FS equipment, backed by Notion databases.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
