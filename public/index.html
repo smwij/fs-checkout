@@ -166,6 +166,15 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
   border-radius:50%; background:rgba(60,60,67,.14); font-size:11px}
 .scancart .citem button:active{opacity:.5}
 #gdFields,#cdBorrowFields{display:flex; flex-direction:column; gap:12px}
+#regBtn{height:38px; border-radius:11px}
+.serialrow{display:flex; gap:8px}
+.serialrow input{flex:1; min-width:0}
+.serialrow button{height:42px; border-radius:11px; min-width:52px; padding:0}
+.previews{display:flex; flex-wrap:wrap; gap:8px}
+.previews .pv{position:relative}
+.previews img{width:72px; height:72px; object-fit:cover; border-radius:10px; display:block; border:1px solid var(--glass-line)}
+.previews button{all:unset; cursor:pointer; position:absolute; top:-6px; right:-6px; width:20px; height:20px; line-height:20px;
+  text-align:center; border-radius:50%; background:rgba(30,30,36,.85); color:#fff; font-size:11px}
 
 /* ---- QR label sheet ---- */
 .labels-actions{display:flex; gap:8px; margin:0 0 10px}
@@ -224,6 +233,7 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M3 12h18"/></svg>
       Scan
     </button>
+    <button class="act secondary" id="regBtn" type="button" title="Add a new item to the inventory">＋ Register</button>
   </div>
 
   <div id="loading" class="empty">Loading inventory…</div>
@@ -283,7 +293,7 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
 <!-- camera scanner with cart: scan several labels, check out once -->
 <dialog id="scanDlg">
   <div class="dhead">
-    <h2>Scan items</h2>
+    <h2 id="scanTitle">Scan items</h2>
     <p class="dmeta" id="scanHint">Scan one label after another — each beep adds it to the cart. Then press Check out and fill the details once.</p>
   </div>
   <div class="scanbox"><video id="scanVideo" playsinline muted autoplay></video><canvas id="scanOverlay"></canvas></div>
@@ -292,8 +302,56 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
   <div class="dbtns">
     <button type="button" class="act secondary" id="scanCancel">Cancel</button>
     <button type="button" class="act" id="scanDone" disabled>Check out</button>
+    <button type="button" class="act" id="scanShutter" hidden>Capture</button>
   </div>
 </dialog>
+
+<!-- register a new item -->
+<dialog id="regDlg">
+  <div class="dhead">
+    <h2>Register item</h2>
+    <p class="dmeta">Adds a new row to FS DB. Nothing existing is changed; No. is assigned automatically.</p>
+  </div>
+  <form id="regForm" method="dialog" novalidate>
+    <label>Item name
+      <input id="rName" list="nameList" required maxlength="100" autocomplete="off" placeholder="e.g. KU Radar">
+    </label>
+    <label>Description
+      <input id="rDesc" maxlength="120" autocomplete="off" placeholder="e.g. Panel, Tray C24 +cable">
+    </label>
+    <label>Serial number
+      <div class="serialrow">
+        <input id="rSerial" maxlength="60" autocomplete="off">
+        <button type="button" class="act" id="rScan" title="Scan the serial sticker's QR or barcode">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M3 12h18"/></svg>
+        </button>
+      </div>
+    </label>
+    <label>Group
+      <input id="rGroup" list="groupList" maxlength="60" autocomplete="off" placeholder="e.g. KU Radar C24">
+    </label>
+    <label>Location
+      <input id="rLoc" list="locList" maxlength="40" autocomplete="off" placeholder="e.g. Store">
+    </label>
+    <label>Photos (optional, up to 6)
+      <div class="serialrow">
+        <input id="rPhoto" type="file" accept="image/*" multiple>
+        <button type="button" class="act" id="rTake" title="Take photos with the camera">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+      </div>
+    </label>
+    <div id="rPreviews" class="previews" hidden></div>
+    <p class="derr" id="rErr"></p>
+    <div class="dbtns">
+      <button type="button" class="act secondary" id="rCancel">Cancel</button>
+      <button type="submit" class="act" id="rSubmit">Register</button>
+    </div>
+  </form>
+</dialog>
+<datalist id="nameList"></datalist>
+<datalist id="groupList"></datalist>
+<datalist id="locList"></datalist>
 
 <!-- cart checkout: borrows for free items, returns for borrowed ones -->
 <dialog id="cartDlg">
@@ -696,7 +754,9 @@ function loadScript(src){
 }
 
 let scanStream = null, scanTick = 0, lastScan = { code: "", t: 0 };
-let zxReader = null;      // cached zxing-wasm module
+let scanCapture = null;    // when set, the scanner feeds the first code to this callback (e.g. serial field)
+let scanPhotoMode = false; // camera as a still camera: no decoding, shutter button instead
+let zxReader = null;       // cached zxing-wasm module
 
 async function loadZXing(){
   if (zxReader) return zxReader;
@@ -705,16 +765,29 @@ async function loadZXing(){
   return (zxReader = m);
 }
 
-async function startScan(){
-  if (!DATA.items.length){ toast("Inventory hasn't loaded yet."); return; }
+async function startScan(capture){
+  scanPhotoMode = capture === "photo";
+  scanCapture = typeof capture === "function" ? capture : null;
+  if (!DATA.items.length && !scanCapture && !scanPhotoMode){ toast("Inventory hasn't loaded yet."); return; }
   const err = $("scanErr"); err.style.display = "none";
   const ovEl = $("scanOverlay");
   ovEl.getContext("2d").clearRect(0, 0, ovEl.width, ovEl.height);   // no stale boxes from last session
-  updateCartUI();   // keep anything scanned before a cancelled checkout
+  $("scanTitle").textContent = scanPhotoMode ? "Take photo" : scanCapture ? "Scan serial" : "Scan items";
+  $("scanHint").textContent = scanPhotoMode
+    ? "Frame the item, then press Capture."
+    : scanCapture
+    ? "Point at the serial sticker — QR code or barcode."
+    : "Scan one label after another — each beep adds it to the cart. Then press Check out and fill the details once.";
+  $("scanDone").hidden = !!(scanCapture || scanPhotoMode);
+  $("scanShutter").hidden = !scanPhotoMode;
+  $("scanCancel").textContent = scanPhotoMode ? "Done" : "Cancel";
+  if (scanCapture || scanPhotoMode) $("scanCart").hidden = true;
+  else updateCartUI();   // keep anything scanned before a cancelled checkout
   $("scanDlg").showModal();
   try {
     scanStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: "environment",
+        width: { ideal: scanPhotoMode ? 1920 : 1280 }, height: { ideal: scanPhotoMode ? 1080 : 720 } },
       audio: false });
   } catch(e){
     notify("Camera unavailable (" + (e.name || e.message) + "). You can also scan a label with your phone's own camera app — it opens this page.");
@@ -724,12 +797,17 @@ async function startScan(){
   const video = $("scanVideo");
   video.srcObject = scanStream;
   await video.play().catch(() => {});
+  if (scanPhotoMode) return;                   // still camera: no decoding, just the shutter
 
+  // Serial stickers carry QR, DataMatrix or 1D barcodes — widen formats in capture mode.
+  const WIDE_NATIVE = ["qr_code", "data_matrix", "code_128", "code_39", "ean_13", "itf"];
+  const WIDE_ZXING = ["QRCode", "DataMatrix", "Code128", "Code39", "EAN-13", "ITF"];
   let detector = null;
   if (window.BarcodeDetector){
     try {
       const sup = await BarcodeDetector.getSupportedFormats();
-      if (sup.includes("qr_code")) detector = new BarcodeDetector({ formats: ["qr_code"] });
+      const want = (scanCapture ? WIDE_NATIVE : ["qr_code"]).filter(f => sup.includes(f));
+      if (want.includes("qr_code")) detector = new BarcodeDetector({ formats: want });
     } catch(e){}
   }
   let zx = null;
@@ -803,7 +881,7 @@ async function startScan(){
         cx.drawImage(video, 0, 0);   // full resolution — zxing is fast enough (~4 ms) and small codes need it
         try {
           const r = await zx.readBarcodes(cx.getImageData(0, 0, w, h),
-            { formats: ["QRCode"], maxNumberOfSymbols: 8, tryHarder: true });
+            { formats: scanCapture ? WIDE_ZXING : ["QRCode"], maxNumberOfSymbols: 8, tryHarder: true });
           codes = r.filter(x => x.isValid).map(x => withCenter(x.text,
             [x.position.topLeft, x.position.topRight, x.position.bottomRight, x.position.bottomLeft]));
         } catch(e){}
@@ -817,7 +895,15 @@ async function startScan(){
       }
       const code = nearestCenter(codes, dw, dh);
       drawBoxes(codes, code, dw, dh);
-      if (code){
+      if (scanCapture){
+        if (code){
+          const cb = scanCapture;
+          beep();
+          stopScan();
+          cb(code);
+          return;
+        }
+      } else if (code){
         const now = Date.now();
         if (code !== lastScan.code || now - lastScan.t > 2500){   // don't re-fire on the same label every frame
           lastScan = { code, t: now };
@@ -834,6 +920,8 @@ async function startScan(){
 
 function stopScan(){
   clearTimeout(scanTick); scanTick = 0;
+  scanCapture = null;
+  scanPhotoMode = false;
   if (scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
   $("scanVideo").srcObject = null;
   if ($("scanDlg").open) $("scanDlg").close();
@@ -886,6 +974,130 @@ function hideLabels(){
 $("labelsLink").onclick = ev => { ev.preventDefault(); showLabels(); };
 $("labelsBack").onclick = hideLabels;
 $("labelsPrint").onclick = () => window.print();
+
+/* ---- register a new item ---- */
+const MAX_PHOTOS = 6;
+let regPhotos = [];   // resized JPEG data URLs, ready to upload
+
+function loadImageFile(file){
+  return new Promise((res, rej) => {
+    const u = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => rej(new Error("couldn't read that image"));
+    im.src = u;
+  });
+}
+
+function renderPreviews(){
+  const box = $("rPreviews");
+  box.hidden = !regPhotos.length;
+  box.innerHTML = regPhotos.map((u, i) =>
+    '<span class="pv"><img src="' + u + '" alt=""><button type="button" data-rmp="' + i + '" aria-label="Remove photo">✕</button></span>').join("");
+}
+
+function addRegPhoto(url){
+  if (regPhotos.length >= MAX_PHOTOS){ toast("Up to " + MAX_PHOTOS + " photos."); return false; }
+  regPhotos.push(url);
+  renderPreviews();
+  return true;
+}
+
+async function pickPhoto(){
+  const files = [...($("rPhoto").files || [])];
+  $("rPhoto").value = "";   // allow re-picking the same file later
+  for (const file of files){
+    try {
+      const im = await loadImageFile(file);
+      const s = Math.min(1, 1600 / Math.max(im.width, im.height));   // keep uploads small
+      const c = document.createElement("canvas");
+      c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      if (!addRegPhoto(c.toDataURL("image/jpeg", 0.82))) break;
+    } catch(e){
+      const re = $("rErr");
+      re.textContent = "Photo problem: " + String(e.message || e);
+      re.style.display = "block";
+    }
+  }
+}
+
+function openRegister(){
+  if (!DATA.items.length){ toast("Inventory hasn't loaded yet."); return; }
+  const fill = (id, vals) => {
+    $(id).innerHTML = [...new Set(vals.filter(Boolean))].sort()
+      .map(v => '<option value="' + esc(v) + '">').join("");
+  };
+  fill("nameList", DATA.items.map(i => i.name));
+  fill("groupList", DATA.items.map(i => i.group));
+  fill("locList", DATA.items.map(i => i.location));
+  $("regForm").reset();
+  regPhotos = [];
+  renderPreviews();
+  const re = $("rErr"); re.style.display = "none"; delete re.dataset.confirmDup;
+  $("rSubmit").disabled = false;
+  $("rSubmit").textContent = "Register";
+  $("regDlg").showModal();
+}
+
+async function submitRegister(ev){
+  ev.preventDefault();
+  const name = $("rName").value.trim();
+  const re = $("rErr");
+  if (!name){ re.textContent = "Enter the item name."; re.style.display = "block"; return; }
+  const serial = $("rSerial").value.trim();
+  const dup = serial && DATA.items.find(i => (i.serial || "").toLowerCase() === serial.toLowerCase());
+  if (dup && !re.dataset.confirmDup){
+    re.textContent = "That serial is already on “" + nameOf(dup) + "”. Press Register again to add anyway.";
+    re.style.display = "block";
+    re.dataset.confirmDup = "1";
+    return;
+  }
+  re.style.display = "none";
+  $("rSubmit").disabled = true;
+  $("rSubmit").textContent = "Saving…";
+  try {
+    await api("/api/register", { method: "POST", body: JSON.stringify({
+      name: name, desc: $("rDesc").value.trim(), serial: serial,
+      group: $("rGroup").value.trim(), location: $("rLoc").value.trim(),
+      photos: regPhotos.length ? regPhotos : undefined
+    })});
+    $("regDlg").close();
+    toast("Registered " + name + " ✓ — its QR is on the label sheet");
+    await load();
+  } catch(err){
+    re.textContent = "Couldn't register: " + String(err.message || err);
+    re.style.display = "block";
+    delete re.dataset.confirmDup;
+    $("rSubmit").disabled = false;
+    $("rSubmit").textContent = "Register";
+  }
+}
+
+$("regBtn").onclick = openRegister;
+$("regForm").addEventListener("submit", submitRegister);
+$("rCancel").onclick = () => $("regDlg").close();
+$("rPhoto").addEventListener("change", pickPhoto);
+$("rScan").onclick = () => startScan(code => { $("rSerial").value = code; });
+$("rTake").onclick = () => startScan("photo");
+$("scanShutter").onclick = () => {
+  const video = $("scanVideo");
+  if (!video.videoWidth) return;
+  const s = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
+  const c = document.createElement("canvas");
+  c.width = Math.round(video.videoWidth * s);
+  c.height = Math.round(video.videoHeight * s);
+  c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+  if (!addRegPhoto(c.toDataURL("image/jpeg", 0.85))) return stopScan();   // hit the photo limit
+  beep();
+  // stay open for the next shot
+  $("scanHint").textContent = regPhotos.length + (regPhotos.length === 1 ? " photo" : " photos") +
+    " taken — capture more or press Done.";
+};
+$("rPreviews").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-rmp]");
+  if (b){ regPhotos.splice(+b.dataset.rmp, 1); renderPreviews(); }
+});
 
 load();
 </script>

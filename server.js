@@ -29,6 +29,25 @@ async function notion(method, pathname, body) {
   return data;
 }
 
+// Upload a data-URL image via Notion's File Upload API; returns the upload id.
+async function notionUpload(dataUrl, filename) {
+  const m = /^data:(image\/[\w.+-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!m) throw new Error("photo must be a base64 image data URL");
+  const type = m[1], buf = Buffer.from(m[2], "base64");
+  if (buf.length > 8 * 1024 * 1024) throw new Error("photo too large (max 8 MB)");
+  const up = await notion("POST", "/file_uploads", { mode: "single_part", filename: filename, content_type: type });
+  const fd = new FormData();
+  fd.append("file", new Blob([buf], { type: type }), filename);
+  const res = await fetch(NOTION + "/file_uploads/" + up.id + "/send", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + TOKEN, "Notion-Version": "2022-06-28" },
+    body: fd
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || ("Notion upload " + res.status));
+  return up.id;
+}
+
 async function queryAll(dbId) {
   const pages = [];
   let cursor;
@@ -103,6 +122,38 @@ async function handleApi(req, body) {
       await notion("POST", "/pages", { parent: { database_id: LOG_DB }, properties: props });
     }
     return { ok: true, batch, count: body.items.length };
+  }
+  if (req.method === "POST" && req.url === "/api/register") {
+    // Creates a NEW row in FS DB; never edits existing rows. No. is auto-assigned.
+    if (!body.name) throw new Error("name is required");
+    const stock = await queryAll(STOCK_DB);
+    const nextNo = stock.reduce((m, pg) => Math.max(m, num(pg.properties["No."]) || 0), 0) + 1;
+    const props = {
+      "Name": { title: [{ text: { content: body.name } }] },
+      "No.": { number: nextNo },
+      "Department": { select: { name: "Cap.dev" } },
+      "Status": { select: { name: "Ready for use" } }
+    };
+    if (body.desc) props["Descriptions"] = rich(body.desc);
+    if (body.serial) props["Serial Number"] = rich(body.serial);
+    if (body.group) props["Group"] = { select: { name: body.group } };
+    if (body.location) props["Location"] = { select: { name: body.location } };
+    if (body.remarks) props["Remarks"] = rich(body.remarks);
+    let extra = {};
+    const photos = Array.isArray(body.photos) ? body.photos.slice(0, 8) : [];
+    if (photos.length) {
+      // Each photo becomes an image block in the page body.
+      const base = body.name.replace(/[^\w.-]+/g, "_") || "item";
+      const children = [];
+      for (let i = 0; i < photos.length; i++) {
+        const fid = await notionUpload(photos[i], base + "-" + (i + 1) + ".jpg");
+        children.push({ object: "block", type: "image", image: { type: "file_upload", file_upload: { id: fid } } });
+      }
+      extra = { children: children };
+    }
+    const pg = await notion("POST", "/pages",
+      Object.assign({ parent: { database_id: STOCK_DB }, properties: props }, extra));
+    return { ok: true, id: pg.id, url: appUrl(pg.id), no: nextNo };
   }
   if (req.method === "POST" && req.url === "/api/return") {
     // body.recordIds: one or many open log records to close.
