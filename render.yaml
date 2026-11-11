@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fs-checkout
+    runtime: node
+    plan: free
+    startCommand: npm start
+    envVars:
+      - key: NOTION_TOKEN
+        sync: false
+      - key: APP_KEY
+        sync: false
