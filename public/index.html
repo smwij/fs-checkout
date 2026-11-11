@@ -315,12 +315,8 @@ dialog form label .fhint{font-weight:400; font-size:11px; text-transform:none; l
   </div>
   <form id="regForm" method="dialog" novalidate>
     <label>Item name
-      <small class="fhint">What the thing is — shown on the group card and QR label</small>
-      <input id="riName" list="nameList" required maxlength="100" autocomplete="off" placeholder="e.g. KU Radar">
-    </label>
-    <label>Description (optional)
-      <small class="fhint">Extra details — model, parts, cables</small>
-      <input id="rDesc" maxlength="120" autocomplete="off" placeholder="e.g. Panel, Tray C24 +cable">
+      <small class="fhint">What the thing is — shown in its group and on the QR label</small>
+      <input id="riName" list="nameList" required maxlength="120" autocomplete="off" placeholder="e.g. Panel, Tray C24 +cable">
     </label>
     <label>Serial number
       <div class="serialrow">
@@ -518,7 +514,7 @@ function render(){
     html += "</div><ul class='blist'>";
     for (const r of recs){
       const it = itemById.get(r.item);
-      const nm = it ? it.name + (it.desc ? " — " + it.desc : "") : "Item";
+      const nm = it ? it.name : "Item";
       const sn = it && it.serial ? "<small>SN " + esc(it.serial) + "</small>" : "";
       html += "<li><div class='n'>" + esc(nm) + sn + "</div>" +
         "<button class='act small secondary' data-rec='" + esc(r.id) + "'>Return</button></li>";
@@ -541,7 +537,7 @@ function openGroup(name, items){
   const list = $("gdList"); list.innerHTML = "";
   for (const it of items){
     const li = document.createElement("li");
-    const nm = esc(it.name) + (it.desc ? " — " + esc(it.desc) : "");
+    const nm = esc(it.name);
     const sn = it.serial ? "<small>SN " + esc(it.serial) + "</small>" : "";
     if (it._state === "av"){
       li.innerHTML = "<label><input type='checkbox' class='pick' checked data-id='" + esc(it.id) + "'>" +
@@ -591,7 +587,7 @@ $("gdForm").onsubmit = async e => {
   const go = $("gdGo"); go.disabled = true; go.textContent = "Saving…";
   try {
     const byId = new Map(gdItems.map(it => [it.id, it]));
-    const items = ids.map(id => { const it = byId.get(id); return { id, name: it ? it.name + (it.desc ? " " + it.desc : "") : "Item", group: it ? it.group : "" }; });
+    const items = ids.map(id => { const it = byId.get(id); return { id, name: it ? it.name : "Item", group: it ? it.group : "" }; });
     await api("/api/borrow", { method: "POST", body: JSON.stringify({
       items, borrower: name, due: $("fDue").value || null,
       project: $("fProject").value.trim() || null, dest: $("fDest").value.trim() || null, note: $("fNote").value.trim() || null
@@ -638,7 +634,7 @@ $("rdForm").onsubmit = async e => {
    URL (or a bare id / serial number). */
 const normCode = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const qrPayload = it => location.origin + "/?scan=" + it.id.replace(/-/g, "");
-const nameOf = it => (it.name || "(unnamed)") + (it.desc ? " — " + it.desc : "");
+const nameOf = it => it.name || "(unnamed)";
 let pendingScan = new URLSearchParams(location.search).get("scan") || "";
 if (pendingScan) history.replaceState(null, "", location.pathname);
 
@@ -729,7 +725,7 @@ $("cdForm").onsubmit = async e => {
     }
     if (borrows.length){
       await api("/api/borrow", { method: "POST", body: JSON.stringify({
-        items: borrows.map(it => ({ id: it.id, name: it.name + (it.desc ? " " + it.desc : ""), group: it.group })),
+        items: borrows.map(it => ({ id: it.id, name: it.name, group: it.group })),
         borrower: name, due: $("cDue").value || null,
         project: $("cProject").value.trim() || null, dest: $("cDest").value.trim() || null, note: $("cNote").value.trim() || null
       })});
@@ -1061,7 +1057,7 @@ async function submitRegister(ev){
   $("rSubmit").textContent = "Saving…";
   try {
     await api("/api/register", { method: "POST", body: JSON.stringify({
-      name: name, desc: $("rDesc").value.trim(), serial: serial,
+      name: name, serial: serial,
       group: $("rGroup").value.trim(), location: $("rLoc").value.trim(),
       photos: regPhotos.length ? regPhotos : undefined
     })});

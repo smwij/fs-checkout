@@ -72,7 +72,7 @@ function mapItem(pg) {
   const p = pg.properties;
   return {
     id: pg.id, url: appUrl(pg.id),
-    name: text(p["Name"]), no: num(p["No."]), desc: text(p["Descriptions"]),
+    name: text(p["Name"]), no: num(p["No."]),
     serial: text(p["Serial Number"]), remarks: text(p["Remarks"]),
     group: sel(p["Group"]) || "Ungrouped", location: sel(p["Location"]), status: sel(p["Status"])
   };
@@ -134,7 +134,6 @@ async function handleApi(req, body) {
       "Department": { select: { name: "Cap.dev" } },
       "Status": { select: { name: "Ready for use" } }
     };
-    if (body.desc) props["Descriptions"] = rich(body.desc);
     if (body.serial) props["Serial Number"] = rich(body.serial);
     if (body.group) props["Group"] = { select: { name: body.group } };
     if (body.location) props["Location"] = { select: { name: body.location } };
