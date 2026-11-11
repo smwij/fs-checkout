@@ -147,6 +147,45 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
 .dbtns button.act{height:46px; border-radius:13px; font-size:16px; min-width:0; width:100%}
 .derr{color:var(--bad-text); font-size:13px; margin:0; display:none; text-align:center}
 
+/* ---- toolbar + QR scanner ---- */
+.toolbar{display:flex; gap:8px; margin:0 0 14px}
+#scanBtn{height:38px; border-radius:11px; display:inline-flex; align-items:center; gap:7px}
+.scanbox{position:relative; margin:12px 20px 0; border-radius:16px; overflow:hidden; background:#000; min-height:200px}
+.scanbox video{display:block; width:100%; max-height:56vh; object-fit:contain}
+.scanbox canvas{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+.scanbox::after{content:""; position:absolute; inset:12%; border:2px solid rgba(255,255,255,.85); border-radius:14px;
+  box-shadow:0 0 0 999px rgba(0,0,0,.28); pointer-events:none}
+#scanDlg .derr{padding:0 20px}
+#scanDlg .dbtns{padding:12px 20px 20px; margin-top:0}
+.scancart{display:flex; flex-wrap:wrap; gap:6px; padding:12px 20px 0}
+.scancart .citem{display:inline-flex; align-items:center; gap:7px; background:var(--accent-tint); color:var(--accent);
+  font-size:13px; font-weight:600; border-radius:999px; padding:4px 7px 4px 12px; max-width:100%}
+.scancart .citem em{font-style:normal; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.scancart .citem.ret{background:var(--warn-tint); color:var(--warn-text)}
+.scancart .citem button{all:unset; cursor:pointer; flex:none; width:19px; height:19px; line-height:19px; text-align:center;
+  border-radius:50%; background:rgba(60,60,67,.14); font-size:11px}
+.scancart .citem button:active{opacity:.5}
+#gdFields,#cdBorrowFields{display:flex; flex-direction:column; gap:12px}
+
+/* ---- QR label sheet ---- */
+.labels-actions{display:flex; gap:8px; margin:0 0 10px}
+.labels-note{color:var(--muted); font-size:14px; margin:0 0 14px; padding-inline:2px}
+.labelgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:10px}
+.label{background:#fff; color:#000; border:1.5px dashed #9a9aa0; border-radius:12px; padding:12px 8px 10px;
+  display:flex; flex-direction:column; align-items:center; text-align:center; break-inside:avoid}
+.label .lqr img,.label .lqr canvas{width:96px; height:96px; display:block}
+.label .ln{font-weight:700; font-size:13px; margin-top:7px; line-height:1.25; overflow-wrap:anywhere}
+.label .ls{font-size:11px; color:#4b4b50; font-variant-numeric:tabular-nums; margin-top:2px; overflow-wrap:anywhere}
+.label .lg{font-size:10px; color:#6c6c70; margin-top:2px; text-transform:uppercase; letter-spacing:.04em}
+
+@media print{
+  body{background:#fff!important; padding:0}
+  body::before,#toast{display:none!important}
+  body.labels-mode .navrow, body.labels-mode header.top, body.labels-mode footer,
+  body.labels-mode .labels-actions, body.labels-mode .labels-note{display:none!important}
+  .label{border-color:#000}
+}
+
 #toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom,0px));
   background:rgba(30,30,36,.88); color:#fff; padding:10px 18px; border-radius:999px; font-size:14px; max-width:86vw;
   z-index:50; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); transition:opacity .3s; opacity:0; pointer-events:none}
@@ -164,6 +203,7 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
 
 <div class="wrap">
   <nav class="navrow">
+    <a href="#" id="labelsLink">QR labels</a>
     <a href="https://app.notion.com/p/415ba2f49658805aa91fc5c3c0a6dd02" target="_blank" rel="noopener">FS database</a>
     <a href="https://app.notion.com/p/6c16dd5dc1224b63921e32ef267329a1" target="_blank" rel="noopener">Borrow log</a>
   </nav>
@@ -179,6 +219,13 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
     <div class="stat gray"><span>Total items</span><b id="nTotal">–</b></div>
   </div>
 
+  <div class="toolbar" id="toolbar" hidden>
+    <button class="act" id="scanBtn" type="button" title="Scan an item's QR label">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M3 12h18"/></svg>
+      Scan
+    </button>
+  </div>
+
   <div id="loading" class="empty">Loading inventory…</div>
   <div id="errbox" class="banner error" hidden></div>
 
@@ -186,6 +233,16 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
 
   <h2 class="sec" id="borrowedHead" hidden>Borrowed</h2>
   <div class="batches" id="batches"></div>
+
+  <section id="labels" hidden>
+    <div class="labels-actions">
+      <button class="act secondary" id="labelsBack" type="button">‹ Back</button>
+      <button class="act" id="labelsPrint" type="button">Print labels</button>
+    </div>
+    <p class="labels-note">Print this sheet, cut out the labels, and stick one on each item or case.
+      Scanning a label — with the in-app Scan button or any phone camera — opens that item's checkout directly.</p>
+    <div class="labelgrid" id="labelGrid"></div>
+  </section>
 
   <footer>Inventory lives in Notion · FS DB is never modified — borrows and returns only write the FS Borrow Log.</footer>
 </div>
@@ -219,6 +276,40 @@ dialog form label input{font-weight:400; font-size:16px; text-transform:none; le
     <div class="dbtns">
       <button class="act secondary" type="button" id="rdCancel">Cancel</button>
       <button class="act" type="submit">Mark returned</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- camera scanner with cart: scan several labels, check out once -->
+<dialog id="scanDlg">
+  <div class="dhead">
+    <h2>Scan items</h2>
+    <p class="dmeta" id="scanHint">Scan one label after another — each beep adds it to the cart. Then press Check out and fill the details once.</p>
+  </div>
+  <div class="scanbox"><video id="scanVideo" playsinline muted autoplay></video><canvas id="scanOverlay"></canvas></div>
+  <div class="scancart" id="scanCart" hidden></div>
+  <p class="derr" id="scanErr"></p>
+  <div class="dbtns">
+    <button type="button" class="act secondary" id="scanCancel">Cancel</button>
+    <button type="button" class="act" id="scanDone" disabled>Check out</button>
+  </div>
+</dialog>
+
+<!-- cart checkout: borrows for free items, returns for borrowed ones -->
+<dialog id="cartDlg">
+  <div class="dhead"><h2>Checkout</h2><p class="dmeta" id="cdMeta"></p></div>
+  <form id="cdForm" method="dialog" novalidate>
+    <label>Your name<input id="cName" autocomplete="name" required></label>
+    <div id="cdBorrowFields">
+      <label>Due back (optional)<input id="cDue" type="date"></label>
+      <label>Project (optional)<input id="cProject"></label>
+      <label>Destination (optional)<input id="cDest"></label>
+      <label>Note (optional)<input id="cNote"></label>
+    </div>
+    <p class="derr" id="cdErr"></p>
+    <div class="dbtns">
+      <button class="act secondary" type="button" id="cdCancel">Cancel</button>
+      <button class="act" type="submit" id="cdGo">Confirm</button>
     </div>
   </form>
 </dialog>
@@ -283,6 +374,13 @@ async function load(){
     openByItem = new Map();
     for (const r of DATA.records) if (r.status === "Borrowed" && r.item) if (!openByItem.has(r.item)) openByItem.set(r.item, r);
     render();
+    if (pendingScan){   // opened via a scanned label URL (?scan=…)
+      const it = findByCode(pendingScan);
+      pendingScan = "";
+      if (!it) toast("No inventory item matches the scanned code.");
+      else if (itemState(it) === "un") toast((it.name || "This item") + " is marked Spoil.");
+      else { cart = [it]; updateCartUI(); openCartDialog(); }
+    }
   } catch (err) {
     $("loading").hidden = true;
     const b = $("errbox"); b.hidden = false;
@@ -301,6 +399,8 @@ function itemState(it){
 }
 
 function render(){
+  if (document.body.classList.contains("labels-mode")) return;   // label sheet is on screen
+  $("toolbar").hidden = false;
   const states = DATA.items.map(itemState);
   $("nAvail").textContent = states.filter(s => s === "av").length;
   $("nBorrowed").textContent = states.filter(s => s === "bo" || s === "od").length;
@@ -470,6 +570,322 @@ $("rdForm").onsubmit = async e => {
     err.textContent = e2.message; err.style.display = "block";
   }
 };
+
+/* ---- QR scanning ----
+   Labels encode  <origin>/?scan=<item id, no dashes> , so any phone camera app
+   opens this page with the item preselected; the in-app scanner parses the same
+   URL (or a bare id / serial number). */
+const normCode = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const qrPayload = it => location.origin + "/?scan=" + it.id.replace(/-/g, "");
+const nameOf = it => (it.name || "(unnamed)") + (it.desc ? " — " + it.desc : "");
+let pendingScan = new URLSearchParams(location.search).get("scan") || "";
+if (pendingScan) history.replaceState(null, "", location.pathname);
+
+function findByCode(text){
+  let code = String(text || "").trim();
+  try { code = new URL(code).searchParams.get("scan") || code; } catch(e){}
+  const n = normCode(code);
+  if (!n) return null;
+  return DATA.items.find(i => normCode(i.id) === n) ||
+         DATA.items.find(i => i.serial && normCode(i.serial) === n) || null;
+}
+
+function beep(){
+  try {
+    const C = window.AudioContext || window.webkitAudioContext;
+    const ctx = new C(), o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 1245; g.gain.value = .12;
+    o.start(); o.stop(ctx.currentTime + .12);
+    setTimeout(() => ctx.close(), 400);
+  } catch(e){}
+  if (navigator.vibrate) try { navigator.vibrate(60); } catch(e){}
+}
+
+function notify(msg){
+  if ($("scanDlg").open){ const el = $("scanErr"); el.textContent = msg; el.style.display = "block"; }
+  else toast(msg);
+}
+
+/* ---- scan cart: scan several, check out once ---- */
+let cart = [];
+
+function addToCart(it){
+  const s = itemState(it);
+  if (s === "un"){ notify((it.name || "This item") + " is marked Spoil."); return; }
+  if (cart.some(c => c.id === it.id)){ notify((it.name || "Item") + " is already in the cart."); return; }
+  cart.push(it);
+  beep();
+  $("scanErr").style.display = "none";
+  updateCartUI();
+}
+
+function updateCartUI(){
+  const box = $("scanCart");
+  box.hidden = !cart.length;
+  box.innerHTML = cart.map((c, i) => {
+    const ret = itemState(c) !== "av";
+    return '<span class="citem' + (ret ? " ret" : "") + '"><em>' + esc(nameOf(c)) + (ret ? " ↩" : "") +
+      '</em><button type="button" data-rm="' + i + '" aria-label="Remove ' + esc(c.name || "item") + '">✕</button></span>';
+  }).join("");
+  const nR = cart.filter(c => itemState(c) !== "av").length, nB = cart.length - nR;
+  const btn = $("scanDone");
+  btn.disabled = !cart.length;
+  btn.textContent = !cart.length ? "Check out"
+    : "Check out: " + (nB ? "borrow " + nB : "") + (nB && nR ? " · " : "") + (nR ? "return " + nR : "");
+}
+
+function openCartDialog(){
+  if (!cart.length) return;
+  const borrows = cart.filter(c => itemState(c) === "av");
+  const returns = cart.filter(c => itemState(c) !== "av");
+  $("cdMeta").textContent = (borrows.length ? "Borrow: " + borrows.map(nameOf).join(", ") : "") +
+    (borrows.length && returns.length ? " — " : "") +
+    (returns.length ? "Return: " + returns.map(nameOf).join(", ") : "");
+  $("cdBorrowFields").hidden = !borrows.length;
+  $("cdErr").style.display = "none";
+  try { $("cName").value = localStorage.getItem("fsName") || ""; } catch(e){}
+  $("cDue").value = ""; $("cProject").value = ""; $("cDest").value = ""; $("cNote").value = "";
+  $("cdGo").disabled = false;
+  $("cdGo").textContent = "Confirm " + cart.length + (cart.length === 1 ? " item" : " items");
+  $("cartDlg").showModal();
+}
+
+$("cdCancel").onclick = () => $("cartDlg").close();
+$("cdForm").onsubmit = async e => {
+  e.preventDefault();
+  const name = $("cName").value.trim();
+  const err = $("cdErr");
+  if (!name){ err.textContent = "Enter your name."; err.style.display = "block"; return; }
+  err.style.display = "none";
+  const borrows = cart.filter(c => itemState(c) === "av");
+  const returns = cart.filter(c => itemState(c) !== "av");
+  const go = $("cdGo"); go.disabled = true; go.textContent = "Saving…";
+  try {
+    if (returns.length){
+      const ids = returns.map(c => openByItem.get(c.id)).filter(Boolean).map(r => r.id);
+      if (ids.length) await api("/api/return", { method: "POST", body: JSON.stringify({ recordIds: ids, borrower: name }) });
+    }
+    if (borrows.length){
+      await api("/api/borrow", { method: "POST", body: JSON.stringify({
+        items: borrows.map(it => ({ id: it.id, name: it.name + (it.desc ? " " + it.desc : ""), group: it.group })),
+        borrower: name, due: $("cDue").value || null,
+        project: $("cProject").value.trim() || null, dest: $("cDest").value.trim() || null, note: $("cNote").value.trim() || null
+      })});
+    }
+    try { localStorage.setItem("fsName", name); } catch(e2){}
+    cart = []; updateCartUI();
+    $("cartDlg").close();
+    toast("Saved ✓");
+    await load();
+  } catch (e2) {
+    err.textContent = e2.message; err.style.display = "block";
+    go.disabled = false; go.textContent = "Retry";
+  }
+};
+
+/* ---- camera scanner: BarcodeDetector → zxing-wasm → jsQR ---- */
+function loadScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => rej(new Error("Couldn't load " + src.split("/").pop() + " — check your connection."));
+    document.head.appendChild(s);
+  });
+}
+
+let scanStream = null, scanTick = 0, lastScan = { code: "", t: 0 };
+let zxReader = null;      // cached zxing-wasm module
+
+async function loadZXing(){
+  if (zxReader) return zxReader;
+  const m = await import("https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.0/reader/+esm");
+  await m.prepareZXingModule({ fireImmediately: true });   // fetch the .wasm up front
+  return (zxReader = m);
+}
+
+async function startScan(){
+  if (!DATA.items.length){ toast("Inventory hasn't loaded yet."); return; }
+  const err = $("scanErr"); err.style.display = "none";
+  const ovEl = $("scanOverlay");
+  ovEl.getContext("2d").clearRect(0, 0, ovEl.width, ovEl.height);   // no stale boxes from last session
+  updateCartUI();   // keep anything scanned before a cancelled checkout
+  $("scanDlg").showModal();
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false });
+  } catch(e){
+    notify("Camera unavailable (" + (e.name || e.message) + "). You can also scan a label with your phone's own camera app — it opens this page.");
+    return;
+  }
+  if (!$("scanDlg").open) return stopScan();   // cancelled while permission prompt was up
+  const video = $("scanVideo");
+  video.srcObject = scanStream;
+  await video.play().catch(() => {});
+
+  let detector = null;
+  if (window.BarcodeDetector){
+    try {
+      const sup = await BarcodeDetector.getSupportedFormats();
+      if (sup.includes("qr_code")) detector = new BarcodeDetector({ formats: ["qr_code"] });
+    } catch(e){}
+  }
+  let zx = null;
+  if (!detector){
+    try { zx = await loadZXing(); }
+    catch(e){
+      if (!window.jsQR){
+        try { await loadScript("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"); }
+        catch(e2){ notify(e2.message); return; }
+      }
+    }
+  }
+  const canvas = document.createElement("canvas");
+  const cx = canvas.getContext("2d", { willReadFrequently: true });
+
+  // Several labels can be in frame at once (uncut sheets, labels side by side):
+  // decode them all and take the one nearest the center of the guide box.
+  const withCenter = (text, corners) => ({ text, corners,
+    cx: corners.reduce((a, p) => a + p.x, 0) / 4, cy: corners.reduce((a, p) => a + p.y, 0) / 4 });
+  const nearestCenter = (codes, w, h) => {
+    let best = null, bd = Infinity;
+    for (const c of codes){
+      const d = (c.cx - w/2) * (c.cx - w/2) + (c.cy - h/2) * (c.cy - h/2);
+      if (d < bd){ bd = d; best = c; }
+    }
+    return best && best.text;
+  };
+
+  // Live bounding boxes: green on the code that will scan, faint on the rest.
+  const ov = $("scanOverlay"), og = ov.getContext("2d");
+  let lastSeen = 0;
+  const drawBoxes = (codes, bestText, dw, dh) => {
+    const now = Date.now();
+    if (codes.length) lastSeen = now;
+    const cw = ov.clientWidth, chh = ov.clientHeight;
+    if (ov.width !== cw) ov.width = cw;
+    if (ov.height !== chh) ov.height = chh;
+    if (!codes.length){
+      if (now - lastSeen > 350) og.clearRect(0, 0, cw, chh);   // short persistence, less flicker
+      return;
+    }
+    og.clearRect(0, 0, cw, chh);
+    // map detection coords onto the letterboxed (object-fit:contain) video area
+    const vr = video.getBoundingClientRect(), br = ov.getBoundingClientRect();
+    const s = Math.min(vr.width / dw, vr.height / dh);
+    const dx = vr.left - br.left + (vr.width - dw * s) / 2;
+    const dy = vr.top - br.top + (vr.height - dh * s) / 2;
+    for (const c of codes){
+      og.beginPath();
+      c.corners.forEach((p, i) => i ? og.lineTo(p.x * s + dx, p.y * s + dy) : og.moveTo(p.x * s + dx, p.y * s + dy));
+      og.closePath();
+      const isBest = c.text === bestText;
+      og.lineWidth = isBest ? 4 : 2;
+      og.strokeStyle = isBest ? "#30d158" : "rgba(255,255,255,.55)";
+      if (isBest){ og.fillStyle = "rgba(48,209,88,.16)"; og.fill(); }
+      og.stroke();
+    }
+  };
+
+  const tick = async () => {
+    if (!scanStream) return;
+    if (video.readyState >= 2 && video.videoWidth){
+      let codes = [], dw = video.videoWidth, dh = video.videoHeight;
+      if (detector){
+        try {
+          const found = await detector.detect(video);
+          codes = found.map(f => withCenter(f.rawValue, f.cornerPoints));
+        } catch(e){}
+      } else if (zx){
+        const w = canvas.width = dw, h = canvas.height = dh;
+        cx.drawImage(video, 0, 0);   // full resolution — zxing is fast enough (~4 ms) and small codes need it
+        try {
+          const r = await zx.readBarcodes(cx.getImageData(0, 0, w, h),
+            { formats: ["QRCode"], maxNumberOfSymbols: 8, tryHarder: true });
+          codes = r.filter(x => x.isValid).map(x => withCenter(x.text,
+            [x.position.topLeft, x.position.topRight, x.position.bottomRight, x.position.bottomLeft]));
+        } catch(e){}
+      } else {
+        dw = canvas.width = Math.min(640, video.videoWidth);
+        dh = canvas.height = Math.round(video.videoHeight * dw / video.videoWidth);
+        cx.drawImage(video, 0, 0, dw, dh);
+        const r = jsQR(cx.getImageData(0, 0, dw, dh).data, dw, dh);
+        if (r) codes = [withCenter(r.data,
+          [r.location.topLeftCorner, r.location.topRightCorner, r.location.bottomRightCorner, r.location.bottomLeftCorner])];
+      }
+      const code = nearestCenter(codes, dw, dh);
+      drawBoxes(codes, code, dw, dh);
+      if (code){
+        const now = Date.now();
+        if (code !== lastScan.code || now - lastScan.t > 2500){   // don't re-fire on the same label every frame
+          lastScan = { code, t: now };
+          const it = findByCode(code);
+          if (it) addToCart(it);   // keep scanning — checkout happens once, via the button
+          else notify("No inventory item matches this code.");
+        }
+      }
+    }
+    scanTick = setTimeout(tick, (detector || zx) ? 60 : 150);   // fast decoders can poll faster
+  };
+  tick();
+}
+
+function stopScan(){
+  clearTimeout(scanTick); scanTick = 0;
+  if (scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  $("scanVideo").srcObject = null;
+  if ($("scanDlg").open) $("scanDlg").close();
+}
+
+$("scanBtn").onclick = startScan;
+$("scanCancel").onclick = stopScan;
+$("scanDlg").addEventListener("close", stopScan);
+$("scanDone").onclick = () => { stopScan(); openCartDialog(); };
+$("scanCart").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-rm]");
+  if (b){ cart.splice(+b.dataset.rm, 1); updateCartUI(); }
+});
+
+/* ---- printable QR label sheet ---- */
+async function showLabels(){
+  if (!DATA.items.length){ toast("Inventory hasn't loaded yet."); return; }
+  if (!window.QRCode){
+    try { await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"); }
+    catch(e){ toast(e.message); return; }
+  }
+  const grid = $("labelGrid");
+  grid.innerHTML = "";
+  DATA.items.forEach(it => {
+    const d = document.createElement("div"); d.className = "label";
+    const q = document.createElement("div"); q.className = "lqr";
+    new QRCode(q, { text: qrPayload(it), width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M });
+    d.appendChild(q);
+    const n = document.createElement("div"); n.className = "ln"; n.textContent = nameOf(it);
+    d.appendChild(n);
+    if (it.serial){ const s = document.createElement("div"); s.className = "ls"; s.textContent = "SN " + it.serial; d.appendChild(s); }
+    const g = document.createElement("div"); g.className = "lg"; g.textContent = it.group;
+    d.appendChild(g);
+    grid.appendChild(d);
+  });
+  document.body.classList.add("labels-mode");
+  ["summary","toolbar","loading","errbox","groups","borrowedHead","batches"].forEach(id => $(id).hidden = true);
+  $("labels").hidden = false;
+  window.scrollTo(0, 0);
+}
+
+function hideLabels(){
+  document.body.classList.remove("labels-mode");
+  $("labels").hidden = true;
+  $("groups").hidden = false;
+  $("batches").hidden = false;
+  render();
+}
+
+$("labelsLink").onclick = ev => { ev.preventDefault(); showLabels(); };
+$("labelsBack").onclick = hideLabels;
+$("labelsPrint").onclick = () => window.print();
 
 load();
 </script>
